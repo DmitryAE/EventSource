@@ -135,6 +135,22 @@ func removeEventListener(_ event: String)
 
 ```
 
+#### URL session configuration:
+
+`EventSource` creates a URL session for every connection. By default the session never times out. Pass your own
+`URLSessionConfiguration` to change this, or anything else in the session:
+
+```swift
+let configuration = URLSessionConfiguration.default
+// The connection fails with `NSURLErrorTimedOut` if no data is received for 5 minutes
+configuration.timeoutIntervalForRequest = 5 * 60
+configuration.timeoutIntervalForResource = TimeInterval(INT_MAX)
+
+let eventSource = EventSource(url: serverURL, headers: [:], configuration: configuration)
+```
+
+`headers` and the event source headers (`Accept`, `Cache-Control`, `Last-Event-Id`) are added to
+`httpAdditionalHeaders` of the configuration.
 
 #### Examples:
 ---

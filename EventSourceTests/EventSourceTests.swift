@@ -38,6 +38,29 @@ class EventSourceTests: XCTestCase {
         )
     }
 
+    func testSessionConfigurationCustom() {
+        let custom = URLSessionConfiguration.default
+        custom.timeoutIntervalForRequest = 360
+        custom.timeoutIntervalForResource = 3600
+        custom.httpAdditionalHeaders = ["custom": "kept", "header": "overridden", "Accept": "overridden"]
+        eventSource = EventSource(url: url, headers: ["header": "value"], configuration: custom)
+        // The event source keeps its own copy
+        custom.timeoutIntervalForRequest = 1
+
+        let configuration = eventSource.sessionConfiguration(lastEventId: "event-id")
+
+        XCTAssertEqual(configuration.timeoutIntervalForRequest, 360)
+        XCTAssertEqual(configuration.timeoutIntervalForResource, 3600)
+        XCTAssertEqual(configuration.httpAdditionalHeaders as? [String: String], [
+            "Last-Event-Id": "event-id", "Accept": "text/event-stream", "Cache-Control": "no-cache",
+            "header": "value", "custom": "kept"]
+        )
+        // The headers of a connection do not leak into the next one
+        XCTAssertEqual(eventSource.sessionConfiguration(lastEventId: nil).httpAdditionalHeaders as? [String: String], [
+            "Accept": "text/event-stream", "Cache-Control": "no-cache", "header": "value", "custom": "kept"]
+        )
+    }
+
     func testAddEventListener() {
         eventSource.addEventListener("event-name") { _, _, _ in }
         XCTAssertEqual(eventSource.events(), ["event-name"])

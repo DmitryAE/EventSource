@@ -91,13 +91,23 @@ open class EventSource: NSObject, EventSourceProtocol, URLSessionDataDelegate {
     private var operationQueue: OperationQueue
     private var mainQueue = DispatchQueue.main
     private var urlSession: URLSession?
+    private let configuration: URLSessionConfiguration?
 
+    /// - Parameters:
+    ///   - url: URL where EventSource will listen for events.
+    ///   - headers: headers sent to the server on every connection.
+    ///   - configuration: configuration of the URL session which is created for every connection. `headers` and
+    ///     the event source headers (`Accept`, `Cache-Control`, `Last-Event-Id`) are added to its additional
+    ///     headers. If nil, the default configuration is used with the request and resource timeouts disabled.
     public init(
         url: URL,
-        headers: [String: String] = [:]
+        headers: [String: String] = [:],
+        configuration: URLSessionConfiguration? = nil
     ) {
         self.url = url
         self.headers = headers
+        // Copied, so the later changes of the passed configuration do not affect the next connections
+        self.configuration = configuration?.copy() as? URLSessionConfiguration
 
         readyState = EventSourceState.closed
         operationQueue = OperationQueue()
@@ -204,10 +214,18 @@ internal extension EventSource {
         additionalHeaders["Accept"] = "text/event-stream"
         additionalHeaders["Cache-Control"] = "no-cache"
 
-        let sessionConfiguration = URLSessionConfiguration.default
-        sessionConfiguration.timeoutIntervalForRequest = TimeInterval(INT_MAX)
-        sessionConfiguration.timeoutIntervalForResource = TimeInterval(INT_MAX)
-        sessionConfiguration.httpAdditionalHeaders = additionalHeaders
+        let sessionConfiguration: URLSessionConfiguration
+        if let configuration = configuration?.copy() as? URLSessionConfiguration {
+            sessionConfiguration = configuration
+        } else {
+            sessionConfiguration = URLSessionConfiguration.default
+            sessionConfiguration.timeoutIntervalForRequest = TimeInterval(INT_MAX)
+            sessionConfiguration.timeoutIntervalForResource = TimeInterval(INT_MAX)
+        }
+
+        var allHeaders = sessionConfiguration.httpAdditionalHeaders ?? [:]
+        additionalHeaders.forEach { allHeaders[$0.key] = $0.value }
+        sessionConfiguration.httpAdditionalHeaders = allHeaders
 
         return sessionConfiguration
     }
